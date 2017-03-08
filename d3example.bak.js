@@ -5,9 +5,9 @@
     // Various accessors that specify the four dimensions of data to visualize.
     function x(d) { return d.lon; }
     function y(d) { return d.lat; }
-    function radius(d) { return 15000000; }
-    function color(d) { return d.region; }
-    function key(d) { return d.name; }
+    function radius(d) { return d.lat; }
+    function color(d) { return d.type; }
+    function key(d) { return d.id; }
 
     // Chart dimensions.
     var margin = {top: 19.5, right: 19.5, bottom: 19.5, left: 39.5},
@@ -15,14 +15,13 @@
         height = 500 - margin.top - margin.bottom;
 
     // Various scales. These domains make assumptions of data, naturally.
-    var xScale = d3.scale.linear().domain([-180, 180]).range([0, width]),
-        yScale = d3.scale.linear().domain([-90, 90]).range([height, 0]),
+    var xScale = d3.scale.log().domain([300, 1e5]).range([0, width]),
+        yScale = d3.scale.linear().domain([10, 85]).range([height, 0]),
         radiusScale = d3.scale.sqrt().domain([0, 5e8]).range([0, 40]),
         colorScale = d3.scale.category20c();
 
     // The x & y axes.
-//  var xAxis = d3.svg.axis().orient("bottom").scale(xScale).ticks(15, d3.format(",d")),
-	var xAxis = d3.svg.axis().scale(xScale).orient("bottom"),
+    var xAxis = d3.svg.axis().orient("bottom").scale(xScale).ticks(12, d3.format(",d")),
         yAxis = d3.svg.axis().scale(yScale).orient("left");
 
     // Create the SVG container and set the origin.
@@ -62,14 +61,14 @@
 
     // Add the year label; the value is set on transition.
     var label = svg.append("text")
-        .attr("class", "year label")
+        .attr("class", "date label")
         .attr("text-anchor", "start")
         .attr("y", 28)
         .attr("x", 30)
-        .text(1800);
+        .text("2012-01-02");
 
     // Load the data.
-    d3.json("nations_geo.json", function(nations) {
+    d3.json("traffic.json", function(violations) {
 
       // A bisector since many nation's data is sparsely-defined.
       var bisect = d3.bisector(function(d) { return d[0]; });
@@ -86,27 +85,26 @@
         return radius(b) - radius(a);
       }
       // Interpolates the dataset for the given (fractional) year.
-      function interpolateData(year) {
-        sharedObject.yearData = nations.map(function(d) {
+      function interpolateData(date) {
+        sharedObject.dateData = violations.data.map(function(d) {
           return {
-            name: d.name,
-            region: d.region,
-            income: interpolateValues(d.income, year),
-            population: interpolateValues(d.population, year),
-            lifeExpectancy: interpolateValues(d.lifeExpectancy, year),
-            lat: d.lat,
-            lon: d.lon
+            id: d[0],
+			lat: 100.00,
+			lon: 200.00,
+//            lat: parseFloat(Math.abs(d[15])),
+//            lon: parseFloat(Math.abs(d[14])),
+			type: d[32]
           };
         });
 
-        return sharedObject.yearData;
+        return sharedObject.dateData;
       }
 
       // Add a dot per nation. Initialize the data at 1800, and set the colors.
       var dot = svg.append("g")
           .attr("class", "dots")
         .selectAll(".dot")
-          .data(interpolateData(1800))
+          .data(interpolateData(new Date("2012-01-02")))
         .enter().append("circle")
           .attr("class", "dot")
           .style("fill", function(d) { return colorScale(color(d)); })
@@ -121,7 +119,7 @@
 
       // Add a title.
       dot.append("title")
-          .text(function(d) { return d.name; });
+          .text(function(d) { return d[0]; });
 
 
       // Tweens the entire chart by first tweening the year, and then the data.
@@ -130,15 +128,26 @@
         var year = d3.interpolateNumber(1800, 2009);
         return function(t) { displayYear(year(t)); };
       }
+	  
+      function tweenDate() {
+        var date = d3.interpolateDate(new Date("2012-01-02"), new Date("2017-02-28"));
+        return function(t) { displayDate(date(t)); };
+      }	  
 
       // Updates the display to show the specified year.
       function displayYear(year) {
         dot.data(interpolateData(year), key).call(position).sort(order);
         label.text(Math.round(year));
       }
+	  
+      function displayDate(date) {
+        dot.data(interpolateData(date), key).call(position).sort(order);
+        label.text(date.year+'.'+date.month+'.'+date.day);
+      }	  
 
       // make displayYear global
-      window.displayYear = displayYear;
+//    window.displayYear = displayYear;
+ 	  window.displayDate = displayDate;
 
       // Finds (and possibly interpolates) the value for the specified year.
       function interpolateValues(values, year) {
@@ -152,11 +161,12 @@
         return a[1];
       }
 
-      sharedObject.dispatch.on("nationMouseover.d3", function(nationObject) {
+      sharedObject.dispatch.on("nationMouseover.d3", function(violationObject) {
           dot.style("fill", function(d) {
-                 if (typeof nationObject !== 'undefined' && d.name === nationObject.name) {
+                 if (typeof violationObject !== 'undefined' && d[0] === violationObject[0]) {
                      return "#00FF00";
                  }
+
                  return colorScale(color(d));
                  });
       });

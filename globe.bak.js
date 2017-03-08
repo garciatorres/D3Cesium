@@ -6,8 +6,8 @@
     var polylines = [];
 	var colorScale = d3.scale.category20c();
 	var selectedData = "health";
-	var selectedNation = 'undefined'
-	var selectedViolation = 'undefined'	
+	var selectedNation = 'undefined';
+	var selectedViolation = 'undefined';	
 	
 	$("#radio").buttonset();
 	$("#radio").css("font-size", "12px");
@@ -20,32 +20,36 @@
 	});
 
     // Load the data.
-    d3.json("nations_geo.json", function(nations) {
+//    d3.json("nations_geo.json", function(nations) {
+	  d3.json("traffic.json", function(violations) {
 
         var ellipsoid = viewer.scene.globe.ellipsoid;
         var primitives = viewer.scene.primitives;
         var polylineCollection = new Cesium.PolylineCollection();
 
         // for each nation defined in nations_geo.json, create a polyline at that lat, lon
-        for (var i = 0; i < nations.length; i++){
-            var nation = nations[i];
-
+        for (var i = 0; i < violations.data.length; i++){
+            var violation = violations.data[i];
+			var vlat = parseFloat(violation[14]);
+			var vlon = parseFloat(violation[15]);
+			
+			if (isNaN(vlat) || isNaN(vlon)) continue;		
             var widePolyline = polylineCollection.add();
             widePolyline.positions = ellipsoid.cartographicArrayToCartesianArray([
-                Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 0.0),
-                Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 100.0)
+                Cesium.Cartographic.fromDegrees(vlon, vlat, 0.0),
+                Cesium.Cartographic.fromDegrees(vlon, vlat, 100.0)
             ]);
 
             // Set a polyline's width
             var outlineMaterial = Cesium.Material.fromType('PolylineOutline');
-            outlineMaterial.uniforms.outlineWidth = 3.0;
+            outlineMaterial.uniforms.outlineWidth = 3000000.0;
             outlineMaterial.uniforms.outlineColor = new Cesium.Color(0.0, 0.0, 0.0, 1.0);
-            outlineMaterial.uniforms.color = Cesium.Color.fromCssColorString(colorScale(nation.region));
+			//the color is the type of the violation
+            outlineMaterial.uniforms.color = Cesium.Color.fromCssColorString(colorScale(violation[26]));
             widePolyline.material = outlineMaterial;
-
             polylines.push(widePolyline);
-        }
-
+			}
+			
         primitives.add(polylineCollection);
     });
 
@@ -59,64 +63,59 @@
         var widthScale = d3.scale.sqrt().domain([0, 5e8]).range([5, 30]);
 
         for (var i=0; i<polylines.length; i++) {
-            var nation = sharedObject.yearData[i];
+            var violation = sharedObject.dateData[i];
             var polyline = polylines[i];
 
- 			if (selectedData === "health") {
+/* 			if (selectedData === "health") {
 				polyline.positions = ellipsoid.cartographicArrayToCartesianArray([
 							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 0.0),
-							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 500000.0)
+							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, yScale(nation.lifeExpectancy))
 							   ]);
-			} else { 
+			} else {
 				polyline.positions = ellipsoid.cartographicArrayToCartesianArray([
 							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 0.0),
-							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, 500000.0)
+							   Cesium.Cartographic.fromDegrees(nation.lon, nation.lat, xScale(nation.income))
 							   ]);
 			}
-            polyline.width = widthScale(100000);
+ */            
+			polyline.positions = ellipsoid.cartographicArrayToCartesianArray([
+			   Cesium.Cartographic.fromDegrees(parseFloat(violation[15]), parseFloat(violation[14]), 0.0),
+			   Cesium.Cartographic.fromDegrees(parseFloat(violation[15]), parseFloat(violation[14]), 10000000.0)
+			   ]);
+
+//			polyline.width = widthScale(nation.population);
+			polyline.width = widthScale(10000000.0);
 
             // push data to polyline so that we have mouseover information available
-            polyline.nationData = nation;
+            polyline.violationData = violation;
 			
-			if (nation.name === selectedNation) {
+			if (violation[0] === selectedViolation) {
 				$("#info table").remove();
 				$("#info").append("<table> \
-				<tr><td>Date of the traffic violation:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Time of the traffic violation:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Description:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Location:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Accident:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Belt(use of):</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Injury:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Fatal:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Alcohol consumption:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>License:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Vehicle:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Driver's race:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
-				<tr><td>Driver's gender:</td><td>" +parseFloat(nation.lifeExpectancy).toFixed(1)+"</td></tr>\
+				<tr><td>Date of the traffic violation:</td><td>" +violation[8]+"</td></tr>\
+				<tr><td>Time of the traffic violation:</td><td>" +violation[9]+"</td></tr>\
 				</table>\
 				");
 				$("#info table").css("font-size", "12px");
 			}
-
             //polyline.material.uniforms.outlineWidth = yScale(nation.lifeExpectancy);
         }
-
     }
-
 
     var viewer = new Cesium.Viewer('cesiumContainer', 
     		{
     			fullscreenElement : document.body
     		});
     
-	var year = 2012;
+	var date = new Date("2012-01-01");
     function animate() {
         var gregorianDate = viewer.clock.currentTime.toGregorianDate();
-        var currentYear = gregorianDate.year + gregorianDate.month/12;// + gregorianDate.day/31;
-        if (currentYear !== year && typeof window.displayYear !== 'undefined'){
-            window.displayYear(currentYear);
-            year = currentYear;
+//      var currentYear = gregorianDate.year + gregorianDate.month/12;// + gregorianDate.day/31;
+		var currentDate = new Date(gregorianDate.year+'-'+gregorianDate.month+'-'+gregorianDate.day);
+/*      if (currentYear !== year && typeof window.displayYear !== 'undefined'){*/
+		if (currentDate != date && typeof window.displayDate !== 'undefined'){	
+            window.displayDate(currentDate);
+			date = currentDate;
             updateLineData();
         }
     }
@@ -134,12 +133,13 @@
     var stamenTonerImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
     viewer.baseLayerPicker.viewModel.selectedImagery = stamenTonerImagery;
 
-	// setup clockview model
-    var yearPerSec = 86400;
+//  setup clockview model
+//  var yearPerSec = 86400*365;
+	var yearPerSec = 36000;
     viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP;
     viewer.clock.startTime = Cesium.JulianDate.fromIso8601("2012-01-02");
     viewer.clock.currentTime = Cesium.JulianDate.fromIso8601("2012-01-02");
-    viewer.clock.stopTime = Cesium.JulianDate.fromIso8601("2017-01-02");
+    viewer.clock.stopTime = Cesium.JulianDate.fromIso8601("2017-02-28");
     viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER;
     viewer.clock.multiplier = yearPerSec * 5;
     viewer.animation.viewModel.setShuttleRingTicks([yearPerSec, yearPerSec*5, yearPerSec*10, yearPerSec*50]);
@@ -148,7 +148,7 @@
         var gregorianDate = date.toGregorianDate();
         return 'Date: ' +gregorianDate.day+'.'+gregorianDate.month+'.'+gregorianDate.year;
     };
-    
+		    
 	// setup timeline
 	function onTimelineScrub(e) {
 		viewer.clock.currentTime = e.timeJulian;
@@ -166,8 +166,8 @@
 		function (movement) {
 			var pickedObject = viewer.scene.pick(movement.endPosition);
 			if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.primitive)) {
-				if (Cesium.defined(pickedObject.primitive.nationData)) {
-					sharedObject.dispatch.nationMouseover(pickedObject.primitive.nationData);
+				if (Cesium.defined(pickedObject.primitive.violationData)) {
+					sharedObject.dispatch.nationMouseover(pickedObject.primitive.violationData);
 				}
 			}
 		},
@@ -180,8 +180,8 @@
 			var pickedObject = viewer.scene.pick(movement.position);
 
 			if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.primitive)) {
-				if (Cesium.defined(pickedObject.primitive.nationData)) {
-					sharedObject.flyTo(pickedObject.primitive.nationData);
+				if (Cesium.defined(pickedObject.primitive.violationData)) {
+					sharedObject.flyTo(pickedObject.primitive.violationData);
 				}
 			}
 		},
@@ -189,41 +189,30 @@
 	);
 	
 	// Response to a nation's mouseover event
-	sharedObject.dispatch.on("nationMouseover.cesium", function(nationObject) {
+	sharedObject.dispatch.on("nationMouseover.cesium", function(violationObject) {
         for (var i=0; i<polylines.length; i++) {
 			var polyline = polylines[i];
-			if (polyline.nationData.name === nationObject.name) {
+			if (polyline.violationData[0] === violationObject.id) {
 				polyline.material.uniforms.color = Cesium.Color.fromCssColorString('#00ff00');
 			}
-			else {
-				polyline.material.uniforms.color = Cesium.Color.fromCssColorString(colorScale(polyline.nationData.region));
+			else {//#32: violation type
+				polyline.material.uniforms.color = Cesium.Color.fromCssColorString(colorScale(polyline.violationData[32]));
 			}
         }
 		
-		selectedNation = nationObject.name;
+		selectedViolation = violationObject[0];
 		
 		$("#info table").remove();
 		$("#info").append("<table> \
-		<tr><td>Date of the traffic violation:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Time of the traffic violation:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Description:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Location:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Accident:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Belt(use of):</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Injury:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Fatal:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Alcohol consumption:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>License:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Vehicle:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Driver's race:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
-		<tr><td>Driver's gender:</td><td>" +parseFloat(nationObject.lifeExpectancy).toFixed(1)+"</td></tr>\
+		<tr><td>Date of the traffic violation:</td><td>" +violation[8]+"</td></tr>\
+		<tr><td>Time of the traffic violation:</td><td>" +violation[9]+"</td></tr>\
 		</table>\
 		");
 		$("#info table").css("font-size", "12px");
 		$("#info").dialog({
-			title : "Violation ID: "+nationObject.name,
+			title : violationObject[0],
 			width: 300,
-			height: 600,
+			height: 150,
 			modal: false,
 			position: {my: "right center", at: "right center", of: "canvas"},
 			show: "slow"
@@ -237,7 +226,7 @@
     sharedObject.flyTo = function(d) {
 		var ellipsoid = viewer.scene.globe.ellipsoid;
 		
-        var destination = Cesium.Cartographic.fromDegrees(d.lon, d.lat-20.0, 10000000.0);
+        var destination = Cesium.Cartographic.fromDegrees(d[15], d[14]-20.0, 10000000.0);
 		var destCartesian = ellipsoid.cartographicToCartesian(destination);
 		destination = ellipsoid.cartesianToCartographic(destCartesian);
 
