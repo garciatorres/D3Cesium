@@ -3,14 +3,14 @@
     "use strict";
 
     // Various accessors that specify the four dimensions of data to visualize.
-    function x(d) { return d.lon; }
-    function y(d) { return d.lat; }
-    function radius(d) { return d.lat; }
-    function color(d) { return d.type; }
-    function key(d) { return d.id; }
+    function x(d) { return d.income; }
+    function y(d) { return d.lifeExpectancy; }
+    function radius(d) { return d.population; }
+    function color(d) { return d.region; }
+    function key(d) { return d.name; }
 
     // Chart dimensions.
-    var margin = {top: 19.5, right: 19.5, bottom: 19.5, left: 39.5},
+    var margin = {top: 9.5, right: 19.5, bottom: 9.5, left: 39.5},
         width = 960 - margin.right,
         height = 500 - margin.top - margin.bottom;
 
@@ -48,7 +48,7 @@
         .attr("text-anchor", "end")
         .attr("x", width)
         .attr("y", height - 6)
-        .text("longitude");
+        .text("income per capita, inflation-adjusted (dollars)");
 
     // Add a y-axis label.
     svg.append("text")
@@ -57,18 +57,18 @@
         .attr("y", 6)
         .attr("dy", ".75em")
         .attr("transform", "rotate(-90)")
-        .text("latitude");
+        .text("life expectancy (years)");
 
     // Add the year label; the value is set on transition.
     var label = svg.append("text")
-        .attr("class", "date label")
+        .attr("class", "year label")
         .attr("text-anchor", "start")
         .attr("y", 28)
         .attr("x", 30)
-        .text("2012-01-02");
+        .text(1800);
 
     // Load the data.
-    d3.json("traffic.json", function(violations) {
+    d3.json("nations_geo.json", function(nations) {
 
       // A bisector since many nation's data is sparsely-defined.
       var bisect = d3.bisector(function(d) { return d[0]; });
@@ -85,33 +85,34 @@
         return radius(b) - radius(a);
       }
       // Interpolates the dataset for the given (fractional) year.
-      function interpolateData(date) {
-        sharedObject.dateData = violations.data.map(function(d) {
+      function interpolateData(year) {
+        sharedObject.yearData = nations.map(function(d) {
           return {
-            id: d[0],
-			lat: 100.00,
-			lon: 200.00,
-//            lat: parseFloat(Math.abs(d[15])),
-//            lon: parseFloat(Math.abs(d[14])),
-			type: d[32]
+            name: d.name,
+            region: d.region,
+            income: interpolateValues(d.income, year),
+            population: interpolateValues(d.population, year),
+            lifeExpectancy: interpolateValues(d.lifeExpectancy, year),
+            lat: d.lat,
+            lon: d.lon
           };
         });
 
-        return sharedObject.dateData;
+        return sharedObject.yearData;
       }
 
       // Add a dot per nation. Initialize the data at 1800, and set the colors.
       var dot = svg.append("g")
           .attr("class", "dots")
         .selectAll(".dot")
-          .data(interpolateData(new Date("2012-01-02")))
+          .data(interpolateData(1800))
         .enter().append("circle")
           .attr("class", "dot")
           .style("fill", function(d) { return colorScale(color(d)); })
           .call(position)
           .sort(order)
-		  .on("mouseover", function(d) { 
-				sharedObject.dispatch.nationMouseover(d); 
+		  .on("mouseover", function(d) {
+				sharedObject.dispatch.nationMouseover(d);
 		  })
           .on("click", function(d){
               sharedObject.flyTo(d);
@@ -119,7 +120,7 @@
 
       // Add a title.
       dot.append("title")
-          .text(function(d) { return d[0]; });
+          .text(function(d) { return d.name; });
 
 
       // Tweens the entire chart by first tweening the year, and then the data.
@@ -128,26 +129,15 @@
         var year = d3.interpolateNumber(1800, 2009);
         return function(t) { displayYear(year(t)); };
       }
-	  
-      function tweenDate() {
-        var date = d3.interpolateDate(new Date("2012-01-02"), new Date("2017-02-28"));
-        return function(t) { displayDate(date(t)); };
-      }	  
 
       // Updates the display to show the specified year.
       function displayYear(year) {
         dot.data(interpolateData(year), key).call(position).sort(order);
         label.text(Math.round(year));
       }
-	  
-      function displayDate(date) {
-        dot.data(interpolateData(date), key).call(position).sort(order);
-        label.text(date.year+'.'+date.month+'.'+date.day);
-      }	  
 
       // make displayYear global
-//    window.displayYear = displayYear;
- 	  window.displayDate = displayDate;
+      window.displayYear = displayYear;
 
       // Finds (and possibly interpolates) the value for the specified year.
       function interpolateValues(values, year) {
@@ -161,9 +151,9 @@
         return a[1];
       }
 
-      sharedObject.dispatch.on("nationMouseover.d3", function(violationObject) {
+      sharedObject.dispatch.on("nationMouseover.d3", function(nationObject) {
           dot.style("fill", function(d) {
-                 if (typeof violationObject !== 'undefined' && d[0] === violationObject[0]) {
+                 if (typeof nationObject !== 'undefined' && d.name === nationObject.name) {
                      return "#00FF00";
                  }
 
