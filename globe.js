@@ -2,9 +2,27 @@
 
 (function() {
     "use strict";
+    var colorScale = d3.scale.category10();
     var yearPerSec = 864000;
     var gregorianDate = new Cesium.GregorianDate();
     var cartesian3Scratch = new Cesium.Cartesian3();
+	  var attribute_options =
+        ["Type",
+         "Charge",
+         "Arrest",
+         "Article",
+         "Agency",
+         "Accident",
+         "Use of Belt",
+         "Injuries",
+         "Damage",
+         "Fatal",
+         "Hazardous Materials",
+         "Alcohol consumption",
+         "Vehicle type",
+         "Vechicle Make",
+         "Race",
+         "Gender"];
 
     var TrafficDataSource = function() {
         // private declarations
@@ -26,7 +44,7 @@
         this._wealthScale = d3.scale.log().domain([300, 1e5]).range([0, 10000000.0]);
         this._healthScale = d3.scale.linear().domain([10, 85]).range([0, 10000000.0]);
         this._populationScale = d3.scale.sqrt().domain([0, 5e8]).range([5.0, 30.0]);
-        this._colorScale = d3.scale.category20c();
+        this._colorScale = d3.scale.category10();
         this._selectedEntity = undefined;
     };
 
@@ -164,19 +182,20 @@
             entity.date = violation[8];
             entity.addProperty('time');
             entity.time = violation[9];
-            entity.addProperty('lat');
-            entity.lat = latitude;
-            entity.addProperty('lon');
-            entity.lon = longitude;
+            entity.addProperty('y');
+            entity.y = violation[14];
+            entity.addProperty('x');
+            entity.x = violation[15];
 
             // if we wanted to use points instead ...
             entity.position = instance;
             entity.point = new Cesium.PointGraphics();
             entity.point.pixelSize = new Cesium.ConstantProperty(10);
-            entity.point.color = new Cesium.ConstantProperty(Cesium.Color.fromCssColorString(this._colorScale(violation[32])));
             entity.point.outlineColor = new Cesium.ConstantProperty(new Cesium.Color(0.0, 0.0, 0.0, 1.0));
-            entity.point.outlineWidth = new Cesium.ConstantProperty(3);
+            entity.point.outlineWidth = new Cesium.ConstantProperty(5);
             entity.point.show = new Cesium.ConstantProperty(true);
+            entity.point.color = new Cesium.ConstantProperty(Cesium.Color.RED);
+
             //Add the entity to the collection.
             entities.add(entity);
         }
@@ -239,25 +258,11 @@
     $("#radio").css("font-size", "12px");
     $("body").css("background-color", "black");
 
-    $("input[name='healthwealth']").change(function(d){
-        var entities = healthAndWealth.entities.entities;
-        healthAndWealth.entities.suspendEvents();
-        for (var i = 0; i < entities.length; i++) {
-            var entity = entities[i];
-            if (d.target.id === 'health') {
-                entity.polyline.positions = new Cesium.PositionPropertyArray([new Cesium.ConstantPositionProperty(entity.surfacePosition), entity.health]);
-            } else {
-                entity.polyline.positions = new Cesium.PositionPropertyArray([new Cesium.ConstantPositionProperty(entity.surfacePosition), entity.wealth]);
-            }
-        }
-        healthAndWealth.entities.resumeEvents();
-    });
-
     var viewer = new Cesium.Viewer('cesiumContainer',
-            {
-                fullscreenElement : document.body,
-                infoBox : false
-            });
+    {
+      fullscreenElement : document.body,
+      infoBox : false
+    });
 
     var stamenTonerImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
     viewer.baseLayerPicker.viewModel.selectedImagery = stamenTonerImagery;
@@ -358,19 +363,43 @@
         });
       });
 
+      // Response to a violation's mouseover event
+    sharedObject.dispatchf.on("filterMouseover.cesium", function() {
+        $("#inff table").remove();
+        if (sharedObject.filter.length>0) {
+          var html_code = "<table>";
+          sharedObject.filter.forEach(function (f) {
+            var a = f.split(".");
+            var color = colorScale(a[1]);
+            html_code = html_code +"<tr><td style='color:"+color+";'> ■ </td><td>"+a[0]+": "+a[1]+"</td></tr>";
+          });
+          html_code = html_code +"</table>";
+          $("#inff").append(html_code);
+          $("#inff table").css("font-size", "12px");
+          $("#inff").dialog({
+              title : "Filter: Excluding",
+              width: 300,
+              height: 125 + sharedObject.filter.length*15,
+              modal: false,
+              position: {my: "left center", at: "left center", of: "canvas"},
+              show: "slow"
+          });
+        } else $("#inff").dialog('close');//else $("#inff").hide();
+      });
 
     // define functionality for flying to a violation
     // this callback is triggered when a violation is clicked
     sharedObject.flyTo = function(violationData) {
         var ellipsoid = viewer.scene.globe.ellipsoid;
-        var destination = Cesium.Cartographic.fromDegrees(violationData.longitude, violationData.latitude, 1000.0);
+        var destination = typeof violationData.longitude!=="undefined"?
+            Cesium.Cartographic.fromDegrees(violationData.longitude, violationData.latitude, 1500.0):
+            Cesium.Cartographic.fromDegrees(violationData.x, violationData.y, 1500.0);
         var destCartesian = ellipsoid.cartographicToCartesian(destination);
         destination = ellipsoid.cartesianToCartographic(destCartesian);
 
         // only fly there if it is not the camera's current position
-        if (!ellipsoid
-                   .cartographicToCartesian(destination)
-                   .equalsEpsilon(viewer.scene.camera.positionWC, Cesium.Math.EPSILON6)) {
+        if (!ellipsoid.cartographicToCartesian(destination)
+            .equalsEpsilon(viewer.scene.camera.positionWC, Cesium.Math.EPSILON6)) {
 
             viewer.scene.camera.flyTo({
                 destination: destCartesian,
